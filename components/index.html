@@ -3,7 +3,6 @@
 <head>
     <style>
         :root {
-            --bg-color: #0e1117;
             --cell-size: 25px;
             --wall-color: #2c3e50;
             --path-color: #f1c40f;
@@ -12,49 +11,24 @@
             --grid-gap: 1px;
         }
         body {
-            margin: 0;
-            padding: 0;
-            background-color: transparent;
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 0; background-color: transparent; font-family: sans-serif;
+            display: flex; flex-direction: column; align-items: center;
         }
         .grid {
-            display: grid;
-            gap: var(--grid-gap);
-            background-color: #444;
-            border: 2px solid #333;
-            cursor: crosshair;
-            user-select: none;
-            margin-bottom: 10px;
+            display: grid; gap: var(--grid-gap); background-color: #444; border: 2px solid #333;
+            cursor: crosshair; user-select: none; margin-bottom: 10px;
         }
         .cell {
-            width: var(--cell-size);
-            height: var(--cell-size);
-            background-color: white;
-            transition: background-color 0.2s;
+            width: var(--cell-size); height: var(--cell-size); background-color: white; transition: background-color 0.2s;
         }
         .cell.wall { background-color: var(--wall-color); }
         .cell.start { background-color: var(--start-color); }
         .cell.end { background-color: var(--end-color); }
-        .cell.path { 
-            background-color: var(--path-color);
-            box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-            border-radius: 4px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-        }
+        .cell.path { background-color: var(--path-color); box-shadow: inset 0 0 5px rgba(0,0,0,0.2); border-radius: 4px; }
+        .controls { display: flex; gap: 10px; }
         button {
-            padding: 8px 16px;
-            border-radius: 5px;
-            background: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
+            padding: 8px 16px; border-radius: 5px; background: #007bff; color: white;
+            border: none; cursor: pointer; font-weight: bold;
         }
         button:hover { background: #0056b3; }
     </style>
@@ -67,17 +41,22 @@
     </div>
 
     <script>
+        // --- LA SOLUCIÓN: PROTOCOLO ESTRICTO DE STREAMLIT ---
+        function sendToStreamlit(type, data) {
+            const message = Object.assign({
+                isStreamlitMessage: true, // ESTA ES LA CLAVE QUE FALTABA
+                type: type,
+            }, data);
+            window.parent.postMessage(message, "*");
+        }
+
         const ROWS = 20;
         const COLS = 20;
         let gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
         const container = document.getElementById('grid-container');
-        
-        function sendToStreamlit(data) {
-            window.parent.postMessage({ type: "streamlit:setComponentValue", value: data }, "*");
-        }
 
         function updateHeight() {
-            window.parent.postMessage({ type: "streamlit:setFrameHeight", value: document.body.scrollHeight }, "*");
+            sendToStreamlit("streamlit:setFrameHeight", { height: document.body.scrollHeight });
         }
 
         container.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
@@ -89,8 +68,7 @@
                 if (r === 0 && c === 0) cell.classList.add('start');
                 if (r === ROWS - 1 && c === COLS - 1) cell.classList.add('end');
                 
-                cell.dataset.r = r;
-                cell.dataset.c = c;
+                cell.dataset.r = r; cell.dataset.c = c;
 
                 cell.addEventListener('mousedown', () => toggleWall(r, c, cell));
                 cell.addEventListener('mouseenter', (e) => {
@@ -104,11 +82,9 @@
         function toggleWall(r, c, cell, forceWall = false) {
             if ((r === 0 && c === 0) || (r === ROWS - 1 && c === COLS - 1)) return;
             if (forceWall) {
-                gridData[r][c] = 1;
-                cell.classList.add('wall');
+                gridData[r][c] = 1; cell.classList.add('wall');
             } else {
-                gridData[r][c] = gridData[r][c] === 0 ? 1 : 0;
-                cell.classList.toggle('wall');
+                gridData[r][c] = gridData[r][c] === 0 ? 1 : 0; cell.classList.toggle('wall');
             }
         }
 
@@ -132,7 +108,10 @@
             }
         });
 
-        document.getElementById('send-btn').onclick = () => sendToStreamlit(gridData);
+        document.getElementById('send-btn').onclick = () => {
+            sendToStreamlit("streamlit:setComponentValue", { value: gridData });
+        };
+        
         document.getElementById('clear-btn').onclick = () => {
             gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
             document.querySelectorAll('.cell').forEach(el => {
@@ -142,19 +121,13 @@
                 if (r === 0 && c === 0) el.classList.add('start');
                 if (r === ROWS - 1 && c === COLS - 1) el.classList.add('end');
             });
-            sendToStreamlit(gridData);
+            sendToStreamlit("streamlit:setComponentValue", { value: gridData });
         };
 
-        // --- EL ARREGLO CRÍTICO ESTÁ AQUÍ ---
+        // SALUDO OFICIAL AL INICIAR LA CARGA
         window.onload = () => {
-            // 1. Mandamos el saludo inicial para que Streamlit sepa que existimos
-            window.parent.postMessage({
-                type: "streamlit:setComponentReady",
-                apiVersion: 1
-            }, "*");
-
-            // 2. Ajustamos la altura de la ventana
-            updateHeight();
+            sendToStreamlit("streamlit:componentReady", { apiVersion: 1 });
+            setTimeout(updateHeight, 150); 
         };
     </script>
 </body>

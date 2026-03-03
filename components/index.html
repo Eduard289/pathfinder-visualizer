@@ -62,33 +62,24 @@
 <body>
     <div id="grid-container" class="grid"></div>
     <div class="controls">
-        <button id="send-btn">Confirmar Mapa y Enviar a Python</button>
+        <button id="send-btn">Confirmar Mapa y Enviar</button>
         <button id="clear-btn" style="background:#6c757d;">Limpiar</button>
     </div>
 
     <script>
-        // --- CONFIGURACIÓN INICIAL ---
         const ROWS = 20;
         const COLS = 20;
         let gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
         const container = document.getElementById('grid-container');
         
-        // --- COMUNICACIÓN CON STREAMLIT ---
         function sendToStreamlit(data) {
-            window.parent.postMessage({
-                type: "streamlit:setComponentValue",
-                value: data
-            }, "*");
+            window.parent.postMessage({ type: "streamlit:setComponentValue", value: data }, "*");
         }
 
         function updateHeight() {
-            window.parent.postMessage({
-                type: "streamlit:setFrameHeight",
-                value: document.body.scrollHeight
-            }, "*");
+            window.parent.postMessage({ type: "streamlit:setFrameHeight", value: document.body.scrollHeight }, "*");
         }
 
-        // --- CONSTRUCCIÓN DE LA CUADRÍCULA ---
         container.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
 
         for (let r = 0; r < ROWS; r++) {
@@ -101,7 +92,6 @@
                 cell.dataset.r = r;
                 cell.dataset.c = c;
 
-                // Eventos de dibujo
                 cell.addEventListener('mousedown', () => toggleWall(r, c, cell));
                 cell.addEventListener('mouseenter', (e) => {
                     if (e.buttons === 1) toggleWall(r, c, cell, true);
@@ -112,9 +102,7 @@
         }
 
         function toggleWall(r, c, cell, forceWall = false) {
-            // No permitir muros en inicio o fin
             if ((r === 0 && c === 0) || (r === ROWS - 1 && c === COLS - 1)) return;
-            
             if (forceWall) {
                 gridData[r][c] = 1;
                 cell.classList.add('wall');
@@ -124,22 +112,18 @@
             }
         }
 
-        // --- PROCESAMIENTO DEL CAMINO (ENTRADA DE PYTHON) ---
         function animatePath(path) {
-            // Limpiar camino previo
             document.querySelectorAll('.cell.path').forEach(el => el.classList.remove('path'));
-            
             path.forEach(([r, c], index) => {
                 setTimeout(() => {
                     const cell = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
                     if (cell && !cell.classList.contains('start') && !cell.classList.contains('end')) {
                         cell.classList.add('path');
                     }
-                }, index * 30); // Animación fluida
+                }, index * 30);
             });
         }
 
-        // Escuchar a Streamlit
         window.addEventListener("message", (event) => {
             if (event.data.type === "streamlit:render") {
                 const { path } = event.data.args;
@@ -148,7 +132,6 @@
             }
         });
 
-        // Botones
         document.getElementById('send-btn').onclick = () => sendToStreamlit(gridData);
         document.getElementById('clear-btn').onclick = () => {
             gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
@@ -162,8 +145,17 @@
             sendToStreamlit(gridData);
         };
 
-        // Ajuste inicial de altura
-        window.onload = updateHeight;
+        // --- EL ARREGLO CRÍTICO ESTÁ AQUÍ ---
+        window.onload = () => {
+            // 1. Mandamos el saludo inicial para que Streamlit sepa que existimos
+            window.parent.postMessage({
+                type: "streamlit:setComponentReady",
+                apiVersion: 1
+            }, "*");
+
+            // 2. Ajustamos la altura de la ventana
+            updateHeight();
+        };
     </script>
 </body>
 </html>

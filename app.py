@@ -10,6 +10,7 @@ st.set_page_config(
 )
 
 # --- ESTILOS PERSONALIZADOS (CORREGIDO) ---
+# Cambiamos unsafe_allow_status_code por unsafe_allow_html
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -23,76 +24,64 @@ st.markdown("""
     }
     .stButton>button:hover {
         background-color: #0056b3;
-        border: 1px solid white;
     }
     </style>
-    """, unsafe_allow_html=True) # Corregido: parámetro oficial de Streamlit
+    """, unsafe_allow_html=True) # Parámetro corregido aquí
 
 # --- INICIALIZACIÓN DEL ESTADO ---
-# Mantenemos el camino en la sesión para que JavaScript pueda leerlo tras el cálculo
+# Mantenemos el camino en la sesión para que persista tras el cálculo
 if "camino" not in st.session_state:
     st.session_state.camino = []
 
-# --- SIDEBAR / CONTROLES ---
-st.sidebar.title("🛠️ Panel de Control")
+# --- SIDEBAR / PANEL DE CONTROL ---
+st.sidebar.title("🛠️ Configuración")
 st.sidebar.markdown("---")
-
 st.sidebar.info("""
-**Guía de uso:**
-1. **Dibuja**: Haz clic o arrastra en la cuadrícula para crear muros azules.
-2. **Sincroniza**: Pulsa el botón **'Confirmar Mapa'** que aparece bajo la cuadrícula.
-3. **Ejecuta**: Pulsa el botón azul de la derecha **'🚀 Calcular Ruta'**.
+**Instrucciones:**
+1. Dibuja los muros en la cuadrícula (clic o arrastrar).
+2. Haz clic en **'Confirmar Mapa'** bajo el lienzo.
+3. Pulsa el botón **'🚀 Calcular Ruta'**.
 """)
 
-if st.sidebar.button("🧹 Limpiar Todo"):
+if st.sidebar.button("🧹 Resetear"):
     st.session_state.camino = []
     st.rerun()
 
 # --- CUERPO PRINCIPAL ---
-st.title("🧠 Pathfinder Visualizer: Algoritmo A*")
-st.write("Visualización interactiva de búsqueda de caminos en tiempo real usando Python y JavaScript.")
+st.title("🧠 Visualizador de Algoritmos: Pathfinder")
+st.write("Dibuja obstáculos y observa cómo el algoritmo A* encuentra la ruta más eficiente.")
 
-# Layout de dos columnas: Mapa y Estadísticas
-col_mapa, col_stats = st.columns([3, 1])
+col_visual, col_ctrl = st.columns([3, 1])
 
-with col_mapa:
-    # Llamada al componente personalizado
-    # 'grid_result' recibe la matriz de muros desde JavaScript
+with col_visual:
+    # Llamamos al componente de JS pasando el camino actual
     grid_result = grid_selector(
         path=st.session_state.camino,
-        key="main_grid_component"
+        key="main_grid"
     )
 
-with col_stats:
+with col_ctrl:
     st.subheader("📊 Ejecución")
     
     if st.button("🚀 Calcular Ruta"):
         if grid_result:
-            # Definimos los puntos de inicio (arriba-izquierda) y fin (abajo-derecha)
             inicio = (0, 0)
             fin = (19, 19)
             
-            # Ejecutamos el algoritmo A* definido en algorithms/a_star.py
-            with st.spinner('Buscando el camino más corto...'):
-                resultado_ruta = a_star_search(grid_result, inicio, fin)
+            # Ejecutamos la lógica de búsqueda en Python
+            with st.spinner('Procesando...'):
+                ruta = a_star_search(grid_result, inicio, fin)
             
-            if resultado_ruta:
-                st.session_state.camino = resultado_ruta
-                st.success("✅ ¡Ruta encontrada!")
-                st.metric("Celdas recorridas", len(resultado_ruta))
-                st.rerun() # Recarga para que el componente JS reciba el nuevo path
+            if ruta:
+                st.session_state.camino = ruta
+                st.success(f"✅ ¡Éxito!")
+                st.metric("Pasos", len(ruta))
+                st.rerun() # Recarga para enviar la ruta al componente
             else:
-                st.error("❌ No existe un camino posible.")
+                st.error("❌ Sin salida")
                 st.session_state.camino = []
         else:
-            st.warning("⚠️ Debes confirmar el mapa en la cuadrícula antes de calcular.")
+            st.warning("⚠️ Confirma el mapa primero.")
 
-    st.markdown("---")
-    st.write("**Leyenda Visual:**")
-    st.write("🟩 Inicio | 🟥 Fin")
-    st.write("🟦 Muro (Bloqueado)")
-    st.write("🟨 Ruta Óptima")
-
-# --- FOOTER ---
 st.markdown("---")
-st.caption("Desarrollado con Streamlit y Custom Components (HTML5 Canvas/JS).")
+st.caption("Hecho con Streamlit y Custom Components (HTML/JS).  Jose Luis Asenjo")

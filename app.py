@@ -45,4 +45,4 @@ with col_ctrl:
 
     if st.button("🧹 Resetear"):
         st.session_state.camino = []
-        st.rerun()
+        st.rerun()rerun()

@@ -1,5 +1,4 @@
 import streamlit as st
-import numpy as np
 from algorithms.a_star import a_star_search
 from components.grid_component import grid_selector
 
@@ -10,86 +9,90 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTILOS PERSONALIZADOS ---
+# --- ESTILOS PERSONALIZADOS (CORREGIDO) ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007bff; color: white; }
-    .reportview-container .main .block-container { padding-top: 2rem; }
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 5px; 
+        height: 3em; 
+        background-color: #007bff; 
+        color: white; 
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #0056b3;
+        border: 1px solid white;
+    }
     </style>
-    """, unsafe_allow_status_code=True)
+    """, unsafe_allow_html=True) # Corregido: parámetro oficial de Streamlit
 
 # --- INICIALIZACIÓN DEL ESTADO ---
-# Usamos session_state para que el camino persista entre renders
+# Mantenemos el camino en la sesión para que JavaScript pueda leerlo tras el cálculo
 if "camino" not in st.session_state:
     st.session_state.camino = []
 
-# --- SIDEBAR (CONTROLES) ---
-st.sidebar.title("🛠️ Configuración")
+# --- SIDEBAR / CONTROLES ---
+st.sidebar.title("🛠️ Panel de Control")
 st.sidebar.markdown("---")
-algoritmo = st.sidebar.selectbox(
-    "Algoritmo de Búsqueda",
-    ["A* (Heurística Manhattan)", "Dijkstra (Uniform Cost)"]
-)
 
 st.sidebar.info("""
-**Instrucciones:**
-1. Dibuja los muros en la cuadrícula (clic o arrastrar).
-2. Haz clic en **'Confirmar Mapa'** dentro del recuadro.
-3. Pulsa el botón **'🚀 Calcular Ruta'** abajo.
+**Guía de uso:**
+1. **Dibuja**: Haz clic o arrastra en la cuadrícula para crear muros azules.
+2. **Sincroniza**: Pulsa el botón **'Confirmar Mapa'** que aparece bajo la cuadrícula.
+3. **Ejecuta**: Pulsa el botón azul de la derecha **'🚀 Calcular Ruta'**.
 """)
 
-if st.sidebar.button("🧹 Resetear Todo"):
+if st.sidebar.button("🧹 Limpiar Todo"):
     st.session_state.camino = []
     st.rerun()
 
 # --- CUERPO PRINCIPAL ---
-st.title("🧠 Visualizador de Algoritmos de Búsqueda")
-st.write("Explora cómo la inteligencia artificial encuentra el camino más corto esquivando obstáculos.")
+st.title("🧠 Pathfinder Visualizer: Algoritmo A*")
+st.write("Visualización interactiva de búsqueda de caminos en tiempo real usando Python y JavaScript.")
 
-col1, col2 = st.columns([3, 1])
+# Layout de dos columnas: Mapa y Estadísticas
+col_mapa, col_stats = st.columns([3, 1])
 
-with col1:
-    # Invocamos el componente personalizado de JavaScript
-    # Enviamos el 'camino' actual para que JS lo dibuje si existe
-    resultado_grid = grid_selector(
-        rows=20, 
-        cols=20, 
+with col_mapa:
+    # Llamada al componente personalizado
+    # 'grid_result' recibe la matriz de muros desde JavaScript
+    grid_result = grid_selector(
         path=st.session_state.camino,
-        key="visualizador_principal"
+        key="main_grid_component"
     )
 
-with col2:
-    st.subheader("📊 Estadísticas")
+with col_stats:
+    st.subheader("📊 Ejecución")
     
     if st.button("🚀 Calcular Ruta"):
-        if resultado_grid:
-            # Definimos puntos de inicio (Top-Left) y fin (Bottom-Right)
+        if grid_result:
+            # Definimos los puntos de inicio (arriba-izquierda) y fin (abajo-derecha)
             inicio = (0, 0)
             fin = (19, 19)
             
-            # Ejecutamos la lógica de búsqueda en Python
-            with st.spinner('Calculando ruta óptima...'):
-                ruta = a_star_search(resultado_grid, inicio, fin)
+            # Ejecutamos el algoritmo A* definido en algorithms/a_star.py
+            with st.spinner('Buscando el camino más corto...'):
+                resultado_ruta = a_star_search(grid_result, inicio, fin)
             
-            if ruta:
-                st.session_state.camino = ruta
-                st.success(f"✅ ¡Ruta encontrada!")
-                st.metric("Longitud del camino", f"{len(ruta)} celdas")
-                st.rerun() # Forzamos recarga para enviar la ruta al componente JS
+            if resultado_ruta:
+                st.session_state.camino = resultado_ruta
+                st.success("✅ ¡Ruta encontrada!")
+                st.metric("Celdas recorridas", len(resultado_ruta))
+                st.rerun() # Recarga para que el componente JS reciba el nuevo path
             else:
-                st.error("❌ No hay camino posible.")
+                st.error("❌ No existe un camino posible.")
                 st.session_state.camino = []
         else:
-            st.warning("⚠️ Primero dibuja muros y pulsa 'Confirmar' en la cuadrícula.")
+            st.warning("⚠️ Debes confirmar el mapa en la cuadrícula antes de calcular.")
 
     st.markdown("---")
-    st.write("**Leyenda:**")
-    st.markdown("- 🟩 **Inicio:** (0,0)")
-    st.markdown("- 🟥 **Fin:** (19,19)")
-    st.markdown("- 🟦 **Muros:** Bloquean el paso")
-    st.markdown("- 🟨 **Ruta:** Camino más corto")
+    st.write("**Leyenda Visual:**")
+    st.write("🟩 Inicio | 🟥 Fin")
+    st.write("🟦 Muro (Bloqueado)")
+    st.write("🟨 Ruta Óptima")
 
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Proyecto desarrollado con Streamlit (Python) y JavaScript Custom Components.")
+st.caption("Desarrollado con Streamlit y Custom Components (HTML5 Canvas/JS).")

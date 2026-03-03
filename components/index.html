@@ -1,134 +1,76 @@
-<!DOCTYPE html>
-<html>
-<head>
+import streamlit as st
+from algorithms.a_star import a_star_search
+from components.grid_component import grid_selector
+
+# --- CONFIGURACIÓN DE LA PÁGINA ---
+st.set_page_config(page_title="Pathfinder Visualizer", layout="wide")
+
+# --- ESTILOS PERSONALIZADOS ---
+st.markdown("""
     <style>
-        :root {
-            --cell-size: 25px;
-            --wall-color: #2c3e50;
-            --path-color: #f1c40f;
-            --start-color: #27ae60;
-            --end-color: #e74c3c;
-            --grid-gap: 1px;
-        }
-        body {
-            margin: 0; padding: 0; background-color: transparent; font-family: sans-serif;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .grid {
-            display: grid; gap: var(--grid-gap); background-color: #444; border: 2px solid #333;
-            cursor: crosshair; user-select: none; margin-bottom: 10px;
-        }
-        .cell {
-            width: var(--cell-size); height: var(--cell-size); background-color: white; transition: background-color 0.2s;
-        }
-        .cell.wall { background-color: var(--wall-color); }
-        .cell.start { background-color: var(--start-color); }
-        .cell.end { background-color: var(--end-color); }
-        .cell.path { background-color: var(--path-color); box-shadow: inset 0 0 5px rgba(0,0,0,0.2); border-radius: 4px; }
-        .controls { display: flex; gap: 10px; }
-        button {
-            padding: 8px 16px; border-radius: 5px; background: #007bff; color: white;
-            border: none; cursor: pointer; font-weight: bold;
-        }
-        button:hover { background: #0056b3; }
+    .main { background-color: #0e1117; }
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 5px; 
+        height: 3em; 
+        background-color: #007bff; 
+        color: white; 
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #0056b3;
+    }
     </style>
-</head>
-<body>
-    <div id="grid-container" class="grid"></div>
-    <div class="controls">
-        <button id="send-btn">Confirmar Mapa y Enviar</button>
-        <button id="clear-btn" style="background:#6c757d;">Limpiar</button>
-    </div>
+    """, unsafe_allow_html=True)
 
-    <script>
-        // --- LA SOLUCIÓN: PROTOCOLO ESTRICTO DE STREAMLIT ---
-        function sendToStreamlit(type, data) {
-            const message = Object.assign({
-                isStreamlitMessage: true, // ESTA ES LA CLAVE QUE FALTABA
-                type: type,
-            }, data);
-            window.parent.postMessage(message, "*");
-        }
+# --- ESTADO DE LA SESIÓN ---
+if "camino" not in st.session_state:
+    st.session_state.camino = []
 
-        const ROWS = 20;
-        const COLS = 20;
-        let gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-        const container = document.getElementById('grid-container');
+# --- ENCABEZADO ---
+st.title("🧠 Visualizador de Algoritmos: Pathfinder")
+st.write("Dibuja obstáculos y observa cómo el algoritmo A* encuentra la ruta más eficiente.")
 
-        function updateHeight() {
-            sendToStreamlit("streamlit:setFrameHeight", { height: document.body.scrollHeight });
-        }
+# --- DISEÑO A DOS COLUMNAS ---
+col_viz, col_ctrl = st.columns([3, 1])
 
-        container.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
+with col_viz:
+    # Renderizamos la cuadrícula interactiva de JavaScript
+    grid_result = grid_selector(path=st.session_state.camino, key="grid_main")
 
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                if (r === 0 && c === 0) cell.classList.add('start');
-                if (r === ROWS - 1 && c === COLS - 1) cell.classList.add('end');
-                
-                cell.dataset.r = r; cell.dataset.c = c;
+with col_ctrl:
+    st.subheader("🛠️ Controles")
+    
+    # --- PANEL DE DIAGNÓSTICO (NUEVO) ---
+    # Esto te dirá si Streamlit está viendo los muros que dibujas
+    if grid_result:
+        muros_detectados = sum(sum(fila) for fila in grid_result)
+        st.info(f"🧱 Muros detectados en Python: {muros_detectados}")
+    else:
+        st.info("Dibuja y pulsa 'Confirmar Mapa y Enviar'")
 
-                cell.addEventListener('mousedown', () => toggleWall(r, c, cell));
-                cell.addEventListener('mouseenter', (e) => {
-                    if (e.buttons === 1) toggleWall(r, c, cell, true);
-                });
+    # --- BOTONES DE ACCIÓN ---
+    if st.button("🚀 Calcular Ruta"):
+        if grid_result:
+            inicio = (0, 0)
+            fin = (19, 19)
+            
+            with st.spinner('Calculando ruta óptima...'):
+                ruta = a_star_search(grid_result, inicio, fin)
+            
+            if ruta:
+                st.session_state.camino = ruta
+                st.success(f"✅ ¡Ruta encontrada! ({len(ruta)} pasos)")
+                st.rerun() 
+            else:
+                st.error("❌ Los muros bloquean la salida.")
+                st.session_state.camino = []
+                st.rerun()
+        else:
+            st.warning("⚠️ Primero confirma el mapa en la cuadrícula.")
 
-                container.appendChild(cell);
-            }
-        }
-
-        function toggleWall(r, c, cell, forceWall = false) {
-            if ((r === 0 && c === 0) || (r === ROWS - 1 && c === COLS - 1)) return;
-            if (forceWall) {
-                gridData[r][c] = 1; cell.classList.add('wall');
-            } else {
-                gridData[r][c] = gridData[r][c] === 0 ? 1 : 0; cell.classList.toggle('wall');
-            }
-        }
-
-        function animatePath(path) {
-            document.querySelectorAll('.cell.path').forEach(el => el.classList.remove('path'));
-            path.forEach(([r, c], index) => {
-                setTimeout(() => {
-                    const cell = document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
-                    if (cell && !cell.classList.contains('start') && !cell.classList.contains('end')) {
-                        cell.classList.add('path');
-                    }
-                }, index * 30);
-            });
-        }
-
-        window.addEventListener("message", (event) => {
-            if (event.data.type === "streamlit:render") {
-                const { path } = event.data.args;
-                if (path && path.length > 0) animatePath(path);
-                updateHeight();
-            }
-        });
-
-        document.getElementById('send-btn').onclick = () => {
-            sendToStreamlit("streamlit:setComponentValue", { value: gridData });
-        };
-        
-        document.getElementById('clear-btn').onclick = () => {
-            gridData = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-            document.querySelectorAll('.cell').forEach(el => {
-                el.classList.remove('wall', 'path');
-                const r = parseInt(el.dataset.r);
-                const c = parseInt(el.dataset.c);
-                if (r === 0 && c === 0) el.classList.add('start');
-                if (r === ROWS - 1 && c === COLS - 1) el.classList.add('end');
-            });
-            sendToStreamlit("streamlit:setComponentValue", { value: gridData });
-        };
-
-        // SALUDO OFICIAL AL INICIAR LA CARGA
-        window.onload = () => {
-            sendToStreamlit("streamlit:componentReady", { apiVersion: 1 });
-            setTimeout(updateHeight, 150); 
-        };
-    </script>
-</body>
-</html>
+    st.markdown("---")
+    
+    if st.button("🧹 Resetear"):
+        st.session_state.camino = []
+        st.rerun()
